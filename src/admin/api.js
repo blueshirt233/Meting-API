@@ -190,9 +190,18 @@ export const adminRoutes = (app) => {
     app.put('/admin/profile', authMiddleware, async (c) => {
         const currentUsername = c.get('username')
         const body = await c.req.json()
-        
-        const result = await store.updateUser(currentUsername, body, currentUsername)
-        
+
+        if (body.role !== undefined || body.password !== undefined) {
+            return c.json({ success: false, error: '禁止通过此接口修改角色或密码' }, 400)
+        }
+
+        const { newUsername } = body
+        if (!newUsername || newUsername === currentUsername) {
+            return c.json({ success: false, error: '新用户名无效' }, 400)
+        }
+
+        const result = await store.updateUser(currentUsername, { newUsername }, currentUsername)
+
         if (result.success) {
             return c.json(result)
         } else {
@@ -230,11 +239,14 @@ export const adminRoutes = (app) => {
         }
         
         const user = store.users.get(username)
-        if (user.password !== store.hashPassword(oldPassword)) {
+        if (!store.verifyPassword(oldPassword, user.password)) {
             return c.json({ success: false, error: '旧密码错误' }, 400)
         }
         
         const result = await store.updateUser(username, { password: newPassword }, username)
+        if (result.success) {
+            store.migratePasswordHash(username, newPassword)
+        }
         return c.json(result)
     })
 
@@ -338,6 +350,13 @@ export const adminRoutes = (app) => {
         const username = c.get('username')
         const result = store.setup2FA(username)
         if (result.success) {
+            try {
+                const QRCode = (await import('qrcode')).default
+                const qrDataUrl = await QRCode.toDataURL(result.data.otpAuthUrl, { width: 200, margin: 1 })
+                result.data.qrDataUrl = qrDataUrl
+            } catch (e) {
+                return c.json({ success: false, error: 'QR码生成失败: ' + e.message }, 500)
+            }
             return c.json(result)
         } else {
             return c.json(result, 400)

@@ -1293,10 +1293,20 @@ const getAdminHtml = () => `<!DOCTYPE html>
             return data;
         };
 
+        const escapeHtml = (str) => {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        };
+
         const showToast = (message, type = 'success') => {
             const toast = document.createElement('div');
             toast.className = 'toast toast-' + type;
-            toast.innerHTML = (type === 'success' ? '✓ ' : '✗ ') + message;
+            toast.textContent = (type === 'success' ? '✓ ' : '✗ ') + message;
             document.body.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';
@@ -1402,7 +1412,7 @@ const getAdminHtml = () => `<!DOCTYPE html>
             if (logsRes?.success) {
                 document.getElementById('totalLogs').textContent = logsRes.data.length;
                 const tbody = document.getElementById('recentLogs');
-                tbody.innerHTML = logsRes.data.slice(0, 5).map(log => '<tr><td>' + formatDate(log.timestamp) + '</td><td>' + log.action + '</td><td>' + log.details + '</td><td>' + log.username + '</td></tr>').join('');
+                tbody.innerHTML = logsRes.data.slice(0, 5).map(log => '<tr><td>' + escapeHtml(formatDate(log.timestamp)) + '</td><td>' + escapeHtml(log.action) + '</td><td>' + escapeHtml(log.details) + '</td><td>' + escapeHtml(log.username) + '</td></tr>').join('');
             }
         };
 
@@ -1424,18 +1434,18 @@ const getAdminHtml = () => `<!DOCTYPE html>
                     }
                 }
                 return '<tr>' +
-                    '<td><span class="badge badge-primary">' + getPlatformName(cookie.platform) + '</span></td>' +
-                    '<td class="cookie-preview" title="' + (cookie.cookiePreview || '') + '">' + (cookie.cookiePreview || '-') + '</td>' +
-                    '<td>' + (cookie.note || '-') + '</td>' +
+                    '<td><span class="badge badge-primary">' + escapeHtml(getPlatformName(cookie.platform)) + '</span></td>' +
+                    '<td class="cookie-preview" title="' + escapeHtml(cookie.cookiePreview || '') + '">' + escapeHtml(cookie.cookiePreview || '-') + '</td>' +
+                    '<td>' + escapeHtml(cookie.note || '-') + '</td>' +
                     '<td><div class="validation-status">' + getValidationBadge(cookie) + '</div>' +
                     (vipAbilityText ? '<div class="user-info-tooltip">' + vipAbilityText + '</div>' : '') +
-                    (cookie.validationError ? '<div style="color:var(--danger);font-size:11px;">' + cookie.validationError + '</div>' : '') + '</td>' +
+                    (cookie.validationError ? '<div style="color:var(--danger);font-size:11px;">' + escapeHtml(cookie.validationError) + '</div>' : '') + '</td>' +
                     '<td>' + (cookie.isActive ? '<span class="status-dot status-active"></span>启用' : '<span class="status-dot status-inactive"></span>禁用') + '</td>' +
-                    '<td>' + formatDate(cookie.createdAt) + '</td>' +
+                    '<td>' + escapeHtml(formatDate(cookie.createdAt)) + '</td>' +
                     '<td class="actions">' +
-                        '<button class="btn btn-success btn-sm" onclick="verifyCookie(\\'' + cookie.id + '\\')">验证</button>' +
-                        '<button class="btn btn-default btn-sm" onclick="editCookie(\\'' + cookie.id + '\\')">编辑</button>' +
-                        '<button class="btn btn-danger btn-sm" onclick="deleteCookie(\\'' + cookie.id + '\\')">删除</button>' +
+                        '<button class="btn btn-success btn-sm" onclick="verifyCookie(\\'' + escapeHtml(cookie.id) + '\\')">验证</button>' +
+                        '<button class="btn btn-default btn-sm" onclick="editCookie(\\'' + escapeHtml(cookie.id) + '\\')">编辑</button>' +
+                        '<button class="btn btn-danger btn-sm" onclick="deleteCookie(\\'' + escapeHtml(cookie.id) + '\\')">删除</button>' +
                     '</td></tr>';
             }).join('');
         };
@@ -1444,14 +1454,14 @@ const getAdminHtml = () => `<!DOCTYPE html>
             const res = await api('/admin/users');
             if (!res?.success) return;
             const tbody = document.getElementById('usersList');
-            tbody.innerHTML = res.data.map(user => '<tr><td>' + user.username + '</td><td><span class="badge ' + (user.role === 'admin' ? 'badge-warning' : 'badge-success') + '">' + (user.role === 'admin' ? '管理员' : '普通用户') + '</span></td><td>' + formatDate(user.createdAt) + '</td><td>' + formatDate(user.lastLogin) + '</td><td class="actions"><button class="btn btn-default btn-sm" onclick="editUser(\\'' + user.username + '\\')">编辑</button>' + (user.username !== 'admin' ? '<button class="btn btn-danger btn-sm" onclick="deleteUser(\\'' + user.username + '\\')">删除</button>' : '') + '</td></tr>').join('');
+            tbody.innerHTML = res.data.map(user => '<tr><td>' + escapeHtml(user.username) + '</td><td><span class="badge ' + (user.role === 'admin' ? 'badge-warning' : 'badge-success') + '">' + (user.role === 'admin' ? '管理员' : '普通用户') + '</span></td><td>' + escapeHtml(formatDate(user.createdAt)) + '</td><td>' + escapeHtml(formatDate(user.lastLogin)) + '</td><td class="actions"><button class="btn btn-default btn-sm" onclick="editUser(\\'' + escapeHtml(user.username) + '\\')">编辑</button>' + (user.username !== 'admin' ? '<button class="btn btn-danger btn-sm" onclick="deleteUser(\\'' + escapeHtml(user.username) + '\\')">删除</button>' : '') + '</td></tr>').join('');
         };
 
         const loadLogs = async () => {
             const res = await api('/admin/logs?limit=100');
             if (!res?.success) return;
             const tbody = document.getElementById('logsList');
-            tbody.innerHTML = res.data.map(log => '<tr><td>' + formatDate(log.timestamp) + '</td><td>' + log.action + '</td><td>' + log.details + '</td><td>' + log.username + '</td></tr>').join('');
+            tbody.innerHTML = res.data.map(log => '<tr><td>' + escapeHtml(formatDate(log.timestamp)) + '</td><td>' + escapeHtml(log.action) + '</td><td>' + escapeHtml(log.details) + '</td><td>' + escapeHtml(log.username) + '</td></tr>').join('');
         };
 
         const loadTokens = async () => {
@@ -1464,13 +1474,13 @@ const getAdminHtml = () => `<!DOCTYPE html>
                 tbody.innerHTML = res.data.map(token => {
                     const tokenPreview = token.id.substring(0, 8) + '...';
                     return '<tr>' +
-                        '<td>' + token.name + '</td>' +
-                        '<td><code style="font-size:11px;color:var(--text-muted);">' + tokenPreview + '</code></td>' +
-                        '<td>' + formatDate(token.createdAt) + '</td>' +
-                        '<td>' + (token.lastUsedAt ? formatDate(token.lastUsedAt) : '-') + '</td>' +
-                        '<td>' + (token.usageCount || 0) + '</td>' +
+                        '<td>' + escapeHtml(token.name) + '</td>' +
+                        '<td><code style="font-size:11px;color:var(--text-muted);">' + escapeHtml(tokenPreview) + '</code></td>' +
+                        '<td>' + escapeHtml(formatDate(token.createdAt)) + '</td>' +
+                        '<td>' + (token.lastUsedAt ? escapeHtml(formatDate(token.lastUsedAt)) : '-') + '</td>' +
+                        '<td>' + escapeHtml(token.usageCount || 0) + '</td>' +
                         '<td class="actions">' +
-                            '<button class="btn btn-danger btn-sm" onclick="deleteToken(\\'' + token.id + '\\',\\'' + token.name + '\\')">删除</button>' +
+                            '<button class="btn btn-danger btn-sm" onclick="deleteToken(\\'' + escapeHtml(token.id) + '\\',\\'' + escapeHtml(token.name) + '\\')">删除</button>' +
                         '</td></tr>';
                 }).join('');
             }
@@ -1573,7 +1583,7 @@ const getAdminHtml = () => `<!DOCTYPE html>
                         else if (log.type === 'vip_unavailable') details = log.platformName + ': ' + (log.note || log.cookieId) + ' - ' + log.reason;
                         else if (log.type === 'webhook_sent') details = '状态码: ' + log.statusCode;
                         else if (log.error) details = log.error;
-                        return '<tr><td>' + formatDate(log.timestamp) + '</td><td><span class="badge ' + typeClass + '">' + typeText + '</span></td><td>' + details + '</td></tr>';
+                        return '<tr><td>' + escapeHtml(formatDate(log.timestamp)) + '</td><td><span class="badge ' + typeClass + '">' + escapeHtml(typeText) + '</span></td><td>' + escapeHtml(details) + '</td></tr>';
                     }).join('');
                 }
             }
@@ -1833,18 +1843,17 @@ const getAdminHtml = () => `<!DOCTYPE html>
             const container = document.getElementById('qrcodeContainer');
             container.innerHTML = '';
             const img = document.createElement('img');
-            img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(text);
             img.alt = '2FA QR Code';
-            img.style.width = '200px';
-            img.style.height = '200px';
-            img.onerror = () => {
-                img.remove();
+            img.style.cssText = 'width:200px;height:200px;display:block;margin:0 auto;';
+            if (twoFASetupData && twoFASetupData.qrDataUrl) {
+                img.src = twoFASetupData.qrDataUrl;
+                container.appendChild(img);
+            } else {
                 const fallback = document.createElement('div');
                 fallback.style.cssText = 'padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;';
-                fallback.innerHTML = '二维码加载失败，请使用下方密钥手动输入';
+                fallback.textContent = '二维码加载失败，请使用下方密钥手动输入';
                 container.appendChild(fallback);
-            };
-            container.appendChild(img);
+            }
         };
 
         const twoFactorSetupGoNext = async () => {

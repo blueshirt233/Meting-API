@@ -24,6 +24,7 @@ const API_TOKENS_FILE = 'api_tokens.json'
 
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 * 60 * 1000
+const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000
 
 const generateSecret = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
@@ -124,14 +125,41 @@ class DataStore {
         this.initialized = true
     }
 
-    hashPassword(password) {
-        let hash = 0
-        for (let i = 0; i < password.length; i++) {
-            const char = password.charCodeAt(i)
-            hash = ((hash << 5) - hash) + char
-            hash = hash & hash
+    hashPassword(password, salt = null) {
+        if (!salt) {
+            salt = nodeCrypto.randomBytes(16).toString('hex')
         }
-        return hash.toString(16)
+        const derivedKey = nodeCrypto.scryptSync(password, salt, 64).toString('hex')
+        return `scrypt:${salt}:${derivedKey}`
+    }
+
+    verifyPassword(password, storedHash) {
+        if (!storedHash) return false
+        if (storedHash.startsWith('scrypt:')) {
+            const parts = storedHash.split(':')
+            if (parts.length !== 3) return false
+            const newHash = this.hashPassword(password, parts[1])
+            return newHash === storedHash
+        }
+        const legacyHash = ((password) => {
+            let hash = 0
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i)
+                hash = ((hash << 5) - hash) + char
+                hash = hash & hash
+            }
+            return hash.toString(16)
+        })(password)
+        return legacyHash === storedHash
+    }
+
+    migratePasswordHash(username, password) {
+        const user = this.users.get(username)
+        if (user && user.password && !user.password.startsWith('scrypt:')) {
+            user.password = this.hashPassword(password)
+            this.users.set(username, user)
+            this.saveToFile()
+        }
     }
 
     async loadFromFile() {
@@ -488,7 +516,7 @@ class DataStore {
             return { success: false, error: '用户不存在' }
         }
 
-        if (user.password !== this.hashPassword(password)) {
+        if (!this.verifyPassword(password, user.password)) {
             this.recordFailedLogin(username)
             const attempts = this.loginAttempts.get(username) || 0
             const remaining = MAX_LOGIN_ATTEMPTS - attempts
@@ -518,7 +546,12 @@ class DataStore {
 
         const token = this.generateId()
         user.token = token
+        user.tokenCreatedAt = Date.now()
+        user.tokenExpiresAt = Date.now() + TOKEN_TTL
         user.lastLogin = Date.now()
+        if (user.password && !user.password.startsWith('scrypt:')) {
+            user.password = this.hashPassword(password)
+        }
         this.users.set(username, user)
         
         await this.addLog('user_login', `用户登录: ${username}`, username)
@@ -549,6 +582,8 @@ class DataStore {
 
         const token = this.generateId()
         user.token = token
+        user.tokenCreatedAt = Date.now()
+        user.tokenExpiresAt = Date.now() + TOKEN_TTL
         user.lastLogin = Date.now()
         this.users.set(username, user)
 
@@ -625,7 +660,7 @@ class DataStore {
             return { success: false, error: '用户不存在' }
         }
 
-        if (user.password !== this.hashPassword(password)) {
+        if (!this.verifyPassword(password, user.password)) {
             return { success: false, error: '密码错误' }
         }
 
@@ -677,7 +712,13 @@ class DataStore {
 
     validateToken(username, token) {
         const user = this.users.get(username)
-        return user && user.token === token
+        if (!user || user.token !== token) return false
+        if (user.tokenExpiresAt && Date.now() > user.tokenExpiresAt) {
+            delete user.token
+            delete user.tokenExpiresAt
+            return false
+        }
+        return true
     }
 
     async addUser(userData, operator = 'system') {
@@ -858,7 +899,23 @@ class DataStore {
     isValidWebhookUrl(url) {
         try {
             const parsed = new URL(url)
-            return ['http:', 'https:'].includes(parsed.protocol)
+            if (!['http:', 'https:'].includes(parsed.protocol)) return false
+            const hostname = parsed.hostname.toLowerCase()
+            if (hostname === 'localhost' || hostname.endsWith('.localhost')) return false
+            const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/)
+            if (ipMatch) {
+                const [a, b] = [parseInt(ipMatch[1]), parseInt(ipMatch[2])]
+                if (a === 10) return false
+                if (a === 127) return false
+                if (a === 0) return false
+                if (a === 169 && b === 254) return false
+                if (a === 172 && b >= 16 && b <= 31) return false
+                if (a === 192 && b === 168) return false
+                if (a >= 224) return false
+            }
+            if (hostname === '::1' || hostname === '::' || hostname.startsWith('fe80:') || hostname.startsWith('fc') || hostname.startsWith('fd')) return false
+            if (hostname.endsWith('.internal') || hostname.endsWith('.local')) return false
+            return true
         } catch {
             return false
         }

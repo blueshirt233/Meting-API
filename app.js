@@ -12,7 +12,11 @@ import { get_runtime, get_url } from './src/util.js'
 
 const app = new Hono()
 
-app.use('*', cors())
+const allowedOrigins = (config.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
+const corsOptions = allowedOrigins.length > 0 ? {
+    origin: (origin) => allowedOrigins.includes(origin) ? origin : null
+} : {}
+app.use('*', cors(corsOptions))
 app.use('*', logger())
 
 adminRoutes(app)

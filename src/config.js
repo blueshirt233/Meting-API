@@ -9,6 +9,8 @@ const PORT = globalThis?.Deno?.env?.get("PORT") || globalThis?.process?.env?.POR
 
 const ADMIN_PATH = globalThis?.Deno?.env?.get("ADMIN_PATH") || globalThis?.process?.env?.ADMIN_PATH || 'admin'
 
+const CORS_ORIGINS = globalThis?.Deno?.env?.get("CORS_ORIGINS") || globalThis?.process?.env?.CORS_ORIGINS || ''
+
 const adminPath = ADMIN_PATH.replace(/^\/+|\/+$/g, '')
 
 OVERSEAS = Boolean(OVERSEAS)
@@ -17,4 +19,5 @@ export default {
     OVERSEAS,
     PORT,
     ADMIN_PATH: adminPath,
+    CORS_ORIGINS,
 }

@@ -28,6 +28,16 @@ export default async (ctx) => {
         return ctx.json({ status: 400, message: 'server 参数不合法', param: { server, type, id } })
     }
 
+    if (!/^[a-zA-Z0-9_,\s\-]+$/.test(id)) {
+        ctx.status(400)
+        return ctx.json({ status: 400, message: 'id 参数包含非法字符', param: { server, type, id } })
+    }
+
+    if (id.length > 256) {
+        ctx.status(400)
+        return ctx.json({ status: 400, message: 'id 参数过长' })
+    }
+
     let cookie = ''
     const storedCookie = store.getActiveCookie(server)
     if (storedCookie) {
@@ -46,10 +56,31 @@ export default async (ctx) => {
         if (url.startsWith('@'))
             return ctx.text(url)
 
+        try {
+            const parsed = new URL(url)
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                ctx.status(400)
+                return ctx.json({ error: 'invalid url protocol' })
+            }
+        } catch {
+            ctx.status(400)
+            return ctx.json({ error: 'invalid url' })
+        }
+
         return ctx.redirect(url)
     }
 
     if (type === 'pic') {
+        try {
+            const parsed = new URL(data)
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                ctx.status(400)
+                return ctx.json({ error: 'invalid pic url protocol' })
+            }
+        } catch {
+            ctx.status(400)
+            return ctx.json({ error: 'invalid pic url' })
+        }
         return ctx.redirect(data)
     }
 
@@ -62,7 +93,7 @@ export default async (ctx) => {
         for (let i of ['url', 'pic', 'lrc']) {
             const _ = String(x[i])
             if (!_.startsWith('@') && !_.startsWith('http') && _.length > 0) {
-                x[i] = `${get_url(ctx)}?server=${server}&type=${i}&id=${_}`
+                x[i] = `${get_url(ctx)}?server=${server}&type=${i}&id=${encodeURIComponent(_)}`
             }
         }
         return x

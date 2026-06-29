@@ -1,5 +1,12 @@
 import store from '../admin/store.js'
 
+const hasPermission = (tokenData, required) => {
+    if (!tokenData) return false
+    const perms = tokenData.permissions || []
+    if (perms.includes('*') || perms.includes('admin')) return true
+    return perms.includes(required)
+}
+
 export const authMiddleware = async (c, next) => {
     const username = c.req.header('X-Auth-Username')
     const token = c.req.header('X-Auth-Token')
@@ -8,11 +15,15 @@ export const authMiddleware = async (c, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const apiToken = authHeader.substring(7)
         const result = store.validateApiToken(apiToken)
-        
+
         if (result.valid) {
-            c.set('username', result.tokenData.createdBy || 'api')
+            const creator = result.tokenData.createdBy || 'api'
+            const creatorUser = store.users.get(creator)
+            const creatorRole = creatorUser?.role || 'user'
+            c.set('username', creator)
             c.set('isApiToken', true)
             c.set('tokenData', result.tokenData)
+            c.set('creatorRole', creatorRole)
             return await next()
         }
     }
@@ -31,18 +42,22 @@ export const authMiddleware = async (c, next) => {
 
 export const adminMiddleware = async (c, next) => {
     const isApiToken = c.get('isApiToken')
-    
+
     if (isApiToken) {
+        const tokenData = c.get('tokenData')
+        if (!hasPermission(tokenData, 'admin')) {
+            return c.json({ success: false, error: 'API Token 权限不足' }, 403)
+        }
         return await next()
     }
-    
+
     const username = c.get('username')
     const user = store.users.get(username)
-    
+
     if (!user || user.role !== 'admin') {
         return c.json({ success: false, error: '权限不足' }, 403)
     }
-    
+
     await next()
 }
 
@@ -54,9 +69,10 @@ export const optionalAuth = async (c, next) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const apiToken = authHeader.substring(7)
         const result = store.validateApiToken(apiToken)
-        
+
         if (result.valid) {
-            c.set('username', result.tokenData.createdBy || 'api')
+            const creator = result.tokenData.createdBy || 'api'
+            c.set('username', creator)
             c.set('isApiToken', true)
             c.set('tokenData', result.tokenData)
             return await next()
@@ -66,6 +82,6 @@ export const optionalAuth = async (c, next) => {
     if (username && token && store.validateToken(username, token)) {
         c.set('username', username)
     }
-    
+
     await next()
 }
