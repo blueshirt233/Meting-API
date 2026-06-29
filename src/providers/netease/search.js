@@ -17,6 +17,10 @@ export const get_search_songs = async (id, cookie = '') => {
         url: '/api/cloudsearch/pc'
     })
 
+    if (!res || !res.result) {
+        return []
+    }
+
     return map_song_list(res.result)
 
 }

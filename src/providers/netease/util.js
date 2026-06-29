@@ -190,6 +190,9 @@ export const request = async (method, url, data = {}, options) => {
 }
 
 export const map_song_list = (song_list) => {
+    if (!song_list || !song_list.songs) {
+        return []
+    }
     return song_list.songs.map(song => {
         const artists = song.ar || song.artists
         return {
