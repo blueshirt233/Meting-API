@@ -14,7 +14,7 @@ const app = new Hono()
 
 const allowedOrigins = (config.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
 const corsOptions = allowedOrigins.length > 0 ? {
-    origin: (origin) => allowedOrigins.includes(origin) ? origin : false
+    origin: (origin) => allowedOrigins.includes(origin) ? origin : null
 } : {}
 app.use('*', cors(corsOptions))
 app.use('*', logger())
