@@ -32,14 +32,27 @@ export default async (ctx) => {
         return ctx.json({ status: 400, message: 'server 参数不合法', param: { server, type, id } })
     }
 
-    if (!/^[a-zA-Z0-9_,\s\-]+$/.test(id)) {
-        ctx.status(400)
-        return ctx.json({ status: 400, message: 'id 参数包含非法字符', param: { server, type, id } })
-    }
-
-    if (id.length > 256) {
-        ctx.status(400)
-        return ctx.json({ status: 400, message: 'id 参数过长' })
+    // search 类型允许更宽松的 id（中文搜索词）
+    if (type === 'search') {
+        if (id.length > 256) {
+            ctx.status(400)
+            return ctx.json({ status: 400, message: 'id 参数过长' })
+        }
+        // 基本安全检查：不允许特殊控制字符
+        if (/[\x00-\x1f\x7f<>{}\\]/.test(id)) {
+            ctx.status(400)
+            return ctx.json({ status: 400, message: 'id 参数包含非法字符' })
+        }
+    } else {
+        // 非搜索类型：只允许字母数字
+        if (!/^[a-zA-Z0-9_,\s\-]+$/.test(id)) {
+            ctx.status(400)
+            return ctx.json({ status: 400, message: 'id 参数包含非法字符', param: { server, type, id } })
+        }
+        if (id.length > 256) {
+            ctx.status(400)
+            return ctx.json({ status: 400, message: 'id 参数过长' })
+        }
     }
 
     let cookie = ''
