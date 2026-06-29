@@ -15,7 +15,8 @@ const app = new Hono()
 const allowedOrigins = (config.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean)
 const corsOptions = allowedOrigins.length > 0 ? {
     origin: (origin) => {
-        if (!origin) return '*' // 同源请求或直接访问，允许所有
+        // 不存在origin时，不设置CORS头，依赖浏览器同源策略
+        if (!origin) return null
         return allowedOrigins.includes(origin) ? origin : null
     }
 } : {}
