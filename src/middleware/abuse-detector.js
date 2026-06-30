@@ -40,8 +40,11 @@ const requestRecords = new Map()
 // 内存封禁列表: ip -> { reason, bannedAt, expiresAt }
 const bannedIPs = new Map()
 
-// 启动时从持久化存储恢复封禁列表
-const initBannedIPs = () => {
+// 启动时从持久化存储恢复封禁列表（延迟到首次请求时执行，确保store已完成初始化）
+let bansLoaded = false
+const loadBannedIPs = () => {
+    if (bansLoaded) return
+    bansLoaded = true
     try {
         const bans = store.getIpBans()
         const now = Date.now()
@@ -61,7 +64,6 @@ const initBannedIPs = () => {
         console.log('[AbuseDetector] 恢复封禁列表失败:', e.message)
     }
 }
-initBannedIPs()
 
 let lastCleanup = 0
 const CLEANUP_INTERVAL = 5 * 60 * 1000
@@ -233,6 +235,7 @@ export const abuseDetectorMiddleware = async (c, next) => {
     }
 
     cleanupExpired(config)
+    loadBannedIPs()
 
     const ip = getClientIP(c)
     const path = c.req.path
