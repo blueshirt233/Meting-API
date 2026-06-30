@@ -40,6 +40,29 @@ const requestRecords = new Map()
 // 内存封禁列表: ip -> { reason, bannedAt, expiresAt }
 const bannedIPs = new Map()
 
+// 启动时从持久化存储恢复封禁列表
+const initBannedIPs = () => {
+    try {
+        const bans = store.getIpBans()
+        const now = Date.now()
+        for (const ban of bans) {
+            if (ban.expiresAt && now < ban.expiresAt) {
+                bannedIPs.set(ban.ip, {
+                    reason: ban.reason,
+                    bannedAt: ban.bannedAt,
+                    expiresAt: ban.expiresAt,
+                })
+            }
+        }
+        if (bannedIPs.size > 0) {
+            console.log(`[AbuseDetector] 已恢复 ${bannedIPs.size} 个封禁IP`)
+        }
+    } catch (e) {
+        console.log('[AbuseDetector] 恢复封禁列表失败:', e.message)
+    }
+}
+initBannedIPs()
+
 let lastCleanup = 0
 const CLEANUP_INTERVAL = 5 * 60 * 1000
 
@@ -58,12 +81,12 @@ const isWhitelisted = (path, ip, config) => {
     return false
 }
 
-const cleanupExpired = () => {
+const cleanupExpired = (config) => {
     const now = Date.now()
     if (now - lastCleanup < CLEANUP_INTERVAL) return
     lastCleanup = now
 
-    const windowMs = DEFAULT_CONFIG.rateLimit.windowMs * 2
+    const windowMs = (config?.rateLimit?.windowMs || DEFAULT_CONFIG.rateLimit.windowMs) * 2
     for (const [ip, record] of requestRecords) {
         if (now - record.lastTime > windowMs) {
             requestRecords.delete(ip)
@@ -209,7 +232,7 @@ export const abuseDetectorMiddleware = async (c, next) => {
         return await next()
     }
 
-    cleanupExpired()
+    cleanupExpired(config)
 
     const ip = getClientIP(c)
     const path = c.req.path
