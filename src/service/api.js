@@ -31,6 +31,7 @@ export default async (ctx) => {
     let logError = ''
     let songName = ''
     let songArtist = ''
+    let logged = false
 
     try {
         if (!p.get_provider_list().includes(server) || !p.get(server).support_type.includes(type)) {
@@ -95,6 +96,7 @@ export default async (ctx) => {
             if (url.startsWith('@')) {
                 logStatusCode = 200
                 apiLogger.addLog({ ip, server, type, requestId: id, status: 'success', statusCode: 200, durationMs: Date.now() - startTime, songName, songArtist, userAgent: ctx.req.header('User-Agent') || '' })
+                logged = true
                 return ctx.text(url)
             }
 
@@ -117,6 +119,7 @@ export default async (ctx) => {
 
             logStatusCode = 302
             apiLogger.addLog({ ip, server, type, requestId: id, status: 'success', statusCode: 302, durationMs: Date.now() - startTime, songName, songArtist, userAgent: ctx.req.header('User-Agent') || '' })
+            logged = true
             return ctx.redirect(url)
         }
 
@@ -139,6 +142,7 @@ export default async (ctx) => {
             }
             logStatusCode = 302
             apiLogger.addLog({ ip, server, type, requestId: id, status: 'success', statusCode: 302, durationMs: Date.now() - startTime, songName, songArtist, userAgent: ctx.req.header('User-Agent') || '' })
+            logged = true
             return ctx.redirect(data)
         }
 
@@ -147,6 +151,7 @@ export default async (ctx) => {
             songName = info.name
             songArtist = info.artist
             apiLogger.addLog({ ip, server, type, requestId: id, status: 'success', statusCode: 200, durationMs: Date.now() - startTime, songName, songArtist, userAgent: ctx.req.header('User-Agent') || '' })
+            logged = true
             return ctx.text(lyricFormat(data.lyric, data.tlyric || ''))
         }
 
@@ -156,6 +161,7 @@ export default async (ctx) => {
         songArtist = info.artist
 
         apiLogger.addLog({ ip, server, type, requestId: id, status: 'success', statusCode: 200, durationMs: Date.now() - startTime, songName, songArtist, userAgent: ctx.req.header('User-Agent') || '' })
+        logged = true
 
         return ctx.json(data.map(x => {
             for (let i of ['url', 'pic', 'lrc']) {
@@ -173,9 +179,8 @@ export default async (ctx) => {
         ctx.status(500)
         return ctx.json({ error: 'internal server error' })
     } finally {
-        // 仅在未提前记录的情况下写入日志（validation error等场景）
-        if (logStatus === 'error' && logError) {
-            apiLogger.addLog({ ip, server, type, requestId: id, status: 'error', statusCode: logStatusCode, durationMs: Date.now() - startTime, songName, songArtist, error: logError, userAgent: ctx.req.header('User-Agent') || '' })
+        if (!logged) {
+            apiLogger.addLog({ ip, server, type, requestId: id, status: logStatus, statusCode: logStatusCode, durationMs: Date.now() - startTime, songName, songArtist, error: logError, userAgent: ctx.req.header('User-Agent') || '' })
         }
     }
 }
