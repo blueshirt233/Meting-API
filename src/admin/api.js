@@ -3,6 +3,7 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth.js'
 import { validateCookie } from './cookie-validator.js'
 import cookieMonitor from './cookie-monitor.js'
 import { banIP, unbanIP, resetIPRecord, getAbuseStats } from '../middleware/abuse-detector.js'
+import apiLogger from '../service/api-logger.js'
 
 const formatCookieForDisplay = (cookie) => {
     const { id, platform, note, createdAt, updatedAt, createdBy, isActive, isValid, validatedAt, userInfo, validationError } = cookie
@@ -521,6 +522,53 @@ export const adminRoutes = (app) => {
         const ip = c.req.param('ip')
         resetIPRecord(ip)
         return c.json({ success: true })
+    })
+
+    // === API 调用日志 ===
+
+    app.get('/admin/api-logs/stats', authMiddleware, async (c) => {
+        return c.json({ success: true, data: apiLogger.getStats() })
+    })
+
+    app.get('/admin/api-logs', authMiddleware, async (c) => {
+        const { startTime, endTime, ip, server, type, status, keyword, page, pageSize } = c.req.query()
+        const result = apiLogger.getLogs({
+            startTime: startTime ? Number(startTime) : undefined,
+            endTime: endTime ? Number(endTime) : undefined,
+            ip: ip || undefined,
+            server: server || undefined,
+            type: type || undefined,
+            status: status || undefined,
+            keyword: keyword || undefined,
+            page: page ? Math.max(1, parseInt(page) || 1) : 1,
+            pageSize: pageSize ? Math.min(200, Math.max(10, parseInt(pageSize) || 50)) : 50,
+        })
+        return c.json({ success: true, ...result })
+    })
+
+    app.delete('/admin/api-logs', authMiddleware, adminMiddleware, async (c) => {
+        apiLogger.clearLogs()
+        await store.addLog('api_logs_clear', '清空API调用日志', c.get('username'))
+        return c.json({ success: true })
+    })
+
+    app.get('/admin/api-logs/export', authMiddleware, async (c) => {
+        const { startTime, endTime, ip, server, type, status, keyword } = c.req.query()
+        const csv = apiLogger.exportCSV({
+            startTime: startTime ? Number(startTime) : undefined,
+            endTime: endTime ? Number(endTime) : undefined,
+            ip: ip || undefined,
+            server: server || undefined,
+            type: type || undefined,
+            status: status || undefined,
+            keyword: keyword || undefined,
+        })
+        return new Response(csv, {
+            headers: {
+                'Content-Type': 'text/csv; charset=utf-8',
+                'Content-Disposition': `attachment; filename="api-logs-${new Date().toISOString().slice(0, 10)}.csv"`,
+            }
+        })
     })
 }
 

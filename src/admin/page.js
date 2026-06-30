@@ -791,6 +791,7 @@ const getAdminHtml = () => `<!DOCTYPE html>
                 <li data-section="abuse"><span class="menu-icon">🛡️</span><span class="menu-text">滥用防护</span></li>
                 <li data-section="users"><span class="menu-icon">👥</span><span class="menu-text">用户管理</span></li>
                 <li data-section="logs"><span class="menu-icon">📋</span><span class="menu-text">操作日志</span></li>
+                <li data-section="apilogs"><span class="menu-icon">📡</span><span class="menu-text">API调用日志</span></li>
                 <li data-section="settings"><span class="menu-icon">⚙️</span><span class="menu-text">设置</span></li>
             </ul>
         </div>
@@ -971,6 +972,94 @@ const getAdminHtml = () => `<!DOCTYPE html>
                                 <thead><tr><th>时间</th><th>操作类型</th><th>详情</th><th>操作人</th></tr></thead>
                                 <tbody id="logsList"></tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API调用日志 -->
+                <div class="content-section" id="apilogsSection">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">📡 API 调用日志</span></div>
+                        <div class="stats-grid" id="apiLogStats">
+                            <div class="stat-card"><div class="stat-label">总调用数</div><div class="stat-value" id="apiLogTotal">-</div></div>
+                            <div class="stat-card"><div class="stat-label">24h 调用</div><div class="stat-value" id="apiLog24h">-</div></div>
+                            <div class="stat-card"><div class="stat-label">独立 IP</div><div class="stat-value" id="apiLogIPs">-</div></div>
+                            <div class="stat-card"><div class="stat-label">成功数</div><div class="stat-value" id="apiLogSuccess">-</div></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">筛选</span></div>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+                            <div class="form-group" style="min-width:140px;">
+                                <label>开始时间</label>
+                                <input type="datetime-local" id="apiLogStartTime">
+                            </div>
+                            <div class="form-group" style="min-width:140px;">
+                                <label>结束时间</label>
+                                <input type="datetime-local" id="apiLogEndTime">
+                            </div>
+                            <div class="form-group" style="min-width:120px;">
+                                <label>IP 地址</label>
+                                <input type="text" id="apiLogIP" placeholder="模糊搜索">
+                            </div>
+                            <div class="form-group" style="min-width:100px;">
+                                <label>平台</label>
+                                <select id="apiLogServer">
+                                    <option value="">全部</option>
+                                    <option value="netease">网易云</option>
+                                    <option value="tencent">QQ音乐</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="min-width:100px;">
+                                <label>类型</label>
+                                <select id="apiLogType">
+                                    <option value="">全部</option>
+                                    <option value="song">歌曲</option>
+                                    <option value="url">URL</option>
+                                    <option value="lrc">歌词</option>
+                                    <option value="pic">图片</option>
+                                    <option value="search">搜索</option>
+                                    <option value="playlist">歌单</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="min-width:90px;">
+                                <label>状态</label>
+                                <select id="apiLogStatus">
+                                    <option value="">全部</option>
+                                    <option value="success">成功</option>
+                                    <option value="error">失败</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="min-width:120px;">
+                                <label>关键词</label>
+                                <input type="text" id="apiLogKeyword" placeholder="ID / 歌曲名">
+                            </div>
+                            <div class="form-group" style="display:flex;gap:8px;align-items:flex-end;">
+                                <button class="btn btn-primary" onclick="loadApiLogs(1)" style="margin-top:auto;">🔍 查询</button>
+                                <button class="btn btn-default" onclick="resetApiLogFilters()" style="margin-top:auto;">重置</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                            <span style="color:var(--text-secondary);font-size:13px;">共 <b id="apiLogTotalCount">0</b> 条记录，第 <b id="apiLogCurrentPage">1</b>/<b id="apiLogTotalPages">1</b> 页</span>
+                            <div style="display:flex;gap:8px;">
+                                <button class="btn btn-default" onclick="exportApiLogs()">📥 导出 CSV</button>
+                                <button class="btn btn-danger" onclick="clearApiLogs()">🗑 清空日志</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead><tr><th>时间</th><th>IP</th><th>平台</th><th>类型</th><th>请求 ID</th><th>状态码</th><th>状态</th><th>耗时</th><th>歌曲信息</th></tr></thead>
+                                <tbody id="apiLogsList"></tbody>
+                            </table>
+                        </div>
+                        <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px;" id="apiLogPagination">
+                            <button class="btn btn-default" onclick="loadApiLogs(1)" id="apiLogFirstBtn" disabled>首页</button>
+                            <button class="btn btn-default" onclick="loadApiLogs(apiLogCurrentPage - 1)" id="apiLogPrevBtn" disabled>上一页</button>
+                            <span style="padding:0 12px;">第 <b id="apiLogPageInfo">1</b> 页</span>
+                            <button class="btn btn-default" onclick="loadApiLogs(apiLogCurrentPage + 1)" id="apiLogNextBtn" disabled>下一页</button>
+                            <button class="btn btn-default" onclick="loadApiLogs(apiLogTotalPages)" id="apiLogLastBtn" disabled>末页</button>
                         </div>
                     </div>
                 </div>
@@ -1521,11 +1610,12 @@ const getAdminHtml = () => `<!DOCTYPE html>
             document.querySelector('[data-section="' + section + '"]').classList.add('active');
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
             document.getElementById(section + 'Section').classList.add('active');
-            const titles = { dashboard: '仪表盘', cookies: 'Cookie管理', monitor: 'Cookie监测', tokens: 'API Token', abuse: '滥用防护', users: '用户管理', logs: '操作日志', settings: '设置' };
+            const titles = { dashboard: '仪表盘', cookies: 'Cookie管理', monitor: 'Cookie监测', tokens: 'API Token', abuse: '滥用防护', users: '用户管理', logs: '操作日志', apilogs: 'API调用日志', settings: '设置' };
             document.getElementById('pageTitle').textContent = titles[section];
             if (section === 'cookies') loadCookies();
             if (section === 'users') loadUsers();
             if (section === 'logs') loadLogs();
+            if (section === 'apilogs') loadApiLogs(1);
             if (section === 'monitor') loadMonitor();
             if (section === 'tokens') loadTokens();
             if (section === 'abuse') loadAbuse();
@@ -1734,6 +1824,122 @@ const getAdminHtml = () => `<!DOCTYPE html>
             if (!res?.success) return;
             const tbody = document.getElementById('logsList');
             tbody.innerHTML = res.data.map(log => '<tr><td>' + escapeHtml(formatDate(log.timestamp)) + '</td><td>' + escapeHtml(log.action) + '</td><td>' + escapeHtml(log.details) + '</td><td>' + escapeHtml(log.username) + '</td></tr>').join('');
+        };
+
+        // === API 调用日志 ===
+        let apiLogCurrentPage = 1;
+        let apiLogTotalPages = 1;
+
+        const getApiLogFilters = () => ({
+            startTime: document.getElementById('apiLogStartTime').value ? new Date(document.getElementById('apiLogStartTime').value).getTime() : '',
+            endTime: document.getElementById('apiLogEndTime').value ? new Date(document.getElementById('apiLogEndTime').value).getTime() : '',
+            ip: document.getElementById('apiLogIP').value.trim(),
+            server: document.getElementById('apiLogServer').value,
+            type: document.getElementById('apiLogType').value,
+            status: document.getElementById('apiLogStatus').value,
+            keyword: document.getElementById('apiLogKeyword').value.trim(),
+        });
+
+        const resetApiLogFilters = () => {
+            document.getElementById('apiLogStartTime').value = '';
+            document.getElementById('apiLogEndTime').value = '';
+            document.getElementById('apiLogIP').value = '';
+            document.getElementById('apiLogServer').value = '';
+            document.getElementById('apiLogType').value = '';
+            document.getElementById('apiLogStatus').value = '';
+            document.getElementById('apiLogKeyword').value = '';
+            loadApiLogs(1);
+        };
+
+        const updateApiLogPagination = () => {
+            document.getElementById('apiLogTotalCount').textContent = '...';
+            document.getElementById('apiLogCurrentPage').textContent = apiLogCurrentPage;
+            document.getElementById('apiLogTotalPages').textContent = apiLogTotalPages;
+            document.getElementById('apiLogPageInfo').textContent = apiLogCurrentPage;
+            document.getElementById('apiLogFirstBtn').disabled = apiLogCurrentPage <= 1;
+            document.getElementById('apiLogPrevBtn').disabled = apiLogCurrentPage <= 1;
+            document.getElementById('apiLogNextBtn').disabled = apiLogCurrentPage >= apiLogTotalPages;
+            document.getElementById('apiLogLastBtn').disabled = apiLogCurrentPage >= apiLogTotalPages;
+        };
+
+        const loadApiLogStats = async () => {
+            try {
+                const res = await api('/admin/api-logs/stats');
+                if (!res?.success) return;
+                const d = res.data;
+                document.getElementById('apiLogTotal').textContent = d.total || 0;
+                document.getElementById('apiLog24h').textContent = d.last24h || 0;
+                document.getElementById('apiLogIPs').textContent = d.uniqueIPs24h || 0;
+                document.getElementById('apiLogSuccess').textContent = (d.byStatus?.success || 0);
+            } catch (_) {}
+        };
+
+        const loadApiLogs = async (page = 1) => {
+            apiLogCurrentPage = page;
+            const filters = getApiLogFilters();
+            const params = new URLSearchParams({ page, pageSize: 50 });
+            if (filters.startTime) params.set('startTime', filters.startTime);
+            if (filters.endTime) params.set('endTime', filters.endTime);
+            if (filters.ip) params.set('ip', filters.ip);
+            if (filters.server) params.set('server', filters.server);
+            if (filters.type) params.set('type', filters.type);
+            if (filters.status) params.set('status', filters.status);
+            if (filters.keyword) params.set('keyword', filters.keyword);
+
+            const res = await api('/admin/api-logs?' + params.toString());
+            if (!res?.success) return;
+
+            const { items, total, totalPages } = res;
+            apiLogTotalPages = totalPages;
+            document.getElementById('apiLogTotalCount').textContent = total;
+
+            const tbody = document.getElementById('apiLogsList');
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:#94a3b8;">暂无记录</td></tr>';
+            } else {
+                tbody.innerHTML = items.map(l => {
+                    const statusBadge = l.status === 'success'
+                        ? '<span class="badge badge-success">成功</span>'
+                        : '<span class="badge badge-error">失败</span>';
+                    const songInfo = l.songName ? (escapeHtml(l.songName) + (l.songArtist ? ' - ' + escapeHtml(l.songArtist) : '')) : '-';
+                    return '<tr>' +
+                        '<td>' + escapeHtml(formatDate(l.timestamp)) + '</td>' +
+                        '<td>' + escapeHtml(l.ip) + '</td>' +
+                        '<td>' + escapeHtml(l.server) + '</td>' +
+                        '<td>' + escapeHtml(l.type) + '</td>' +
+                        '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(l.requestId) + '">' + escapeHtml(l.requestId) + '</td>' +
+                        '<td>' + escapeHtml(String(l.statusCode)) + '</td>' +
+                        '<td>' + statusBadge + '</td>' +
+                        '<td>' + escapeHtml(l.durationMs + 'ms') + '</td>' +
+                        '<td>' + songInfo + '</td>' +
+                        '</tr>';
+                }).join('');
+            }
+            updateApiLogPagination();
+            loadApiLogStats();
+        };
+
+        const exportApiLogs = () => {
+            const filters = getApiLogFilters();
+            const params = new URLSearchParams();
+            if (filters.startTime) params.set('startTime', filters.startTime);
+            if (filters.endTime) params.set('endTime', filters.endTime);
+            if (filters.ip) params.set('ip', filters.ip);
+            if (filters.server) params.set('server', filters.server);
+            if (filters.type) params.set('type', filters.type);
+            if (filters.status) params.set('status', filters.status);
+            if (filters.keyword) params.set('keyword', filters.keyword);
+            window.open('/admin/api-logs/export?' + params.toString(), '_blank');
+        };
+
+        const clearApiLogs = async () => {
+            if (!confirm('确定要清空所有 API 调用日志吗？此操作不可恢复。')) return;
+            const res = await api('/admin/api-logs', 'DELETE');
+            if (res?.success) {
+                loadApiLogs(1);
+            } else {
+                alert('清空失败: ' + (res?.error || '未知错误'));
+            }
         };
 
         const loadTokens = async () => {
