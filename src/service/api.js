@@ -23,11 +23,7 @@ export default async (ctx) => {
     const type = query.type || 'playlist'
     const id = query.id || '7326220405'
 
-    // 调试日志
-    console.log('[API] query:', JSON.stringify(query), 'defaults:', { server, type, id })
-
     if (!p.get_provider_list().includes(server) || !p.get(server).support_type.includes(type)) {
-        console.log('[API] 400 - server/type not valid. providers:', p.get_provider_list(), 'support:', p.get(server)?.support_type)
         ctx.status(400)
         return ctx.json({ status: 400, message: 'server 参数不合法', param: { server, type, id } })
     }

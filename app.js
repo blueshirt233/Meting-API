@@ -4,6 +4,7 @@ import { adminPageHandler } from './src/admin/page.js'
 import adminRoutes from './src/admin/api.js'
 import store from './src/admin/store.js'
 import cookieMonitor from './src/admin/cookie-monitor.js'
+import abuseDetectorMiddleware from './src/middleware/abuse-detector.js'
 import { Hono } from 'hono'
 import { logger } from 'hono/logger'
 import { cors } from 'hono/cors'
@@ -22,6 +23,7 @@ const corsOptions = allowedOrigins.length > 0 ? {
 } : {}
 app.use('*', cors(corsOptions))
 app.use('*', logger())
+app.use('*', abuseDetectorMiddleware)
 
 adminRoutes(app)
 

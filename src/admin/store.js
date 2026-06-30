@@ -21,6 +21,8 @@ const SECURITY_FILE = 'security.json'
 const CONFIG_FILE = 'config.json'
 const MONITOR_LOGS_FILE = 'monitor_logs.json'
 const API_TOKENS_FILE = 'api_tokens.json'
+const ABUSE_LOGS_FILE = 'abuse_logs.json'
+const IP_BANS_FILE = 'ip_bans.json'
 
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCKOUT_DURATION = 15 * 60 * 1000
@@ -95,6 +97,8 @@ class DataStore {
         this.config = {}
         this.monitorLogs = []
         this.apiTokens = new Map()
+        this.abuseLogs = []
+        this.ipBans = new Map()
         this.initialized = false
     }
 
@@ -205,6 +209,17 @@ class DataStore {
                 const data = JSON.parse(fs.readFileSync(apiTokensPath, 'utf-8'))
                 this.apiTokens = new Map(Object.entries(data))
             }
+
+            const abuseLogsPath = path.join(DATA_DIR, ABUSE_LOGS_FILE)
+            if (fs.existsSync(abuseLogsPath)) {
+                this.abuseLogs = JSON.parse(fs.readFileSync(abuseLogsPath, 'utf-8'))
+            }
+
+            const ipBansPath = path.join(DATA_DIR, IP_BANS_FILE)
+            if (fs.existsSync(ipBansPath)) {
+                const data = JSON.parse(fs.readFileSync(ipBansPath, 'utf-8'))
+                this.ipBans = new Map(Object.entries(data))
+            }
         } catch (e) {
             console.error('Load data error:', e.message)
         }
@@ -240,6 +255,17 @@ class DataStore {
             
             const apiTokensPath = path.join(DATA_DIR, API_TOKENS_FILE)
             fs.writeFileSync(apiTokensPath, JSON.stringify(Object.fromEntries(this.apiTokens), null, 2))
+
+            const abuseLogsPath = path.join(DATA_DIR, ABUSE_LOGS_FILE)
+            const recentAbuseLogs = this.abuseLogs.slice(-1000)
+            fs.writeFileSync(abuseLogsPath, JSON.stringify(recentAbuseLogs, null, 2))
+
+            const ipBansPath = path.join(DATA_DIR, IP_BANS_FILE)
+            const banData = {}
+            for (const [ip, ban] of this.ipBans) {
+                banData[ip] = ban
+            }
+            fs.writeFileSync(ipBansPath, JSON.stringify(banData, null, 2))
         } catch (e) {
             console.error('Save data error:', e.message)
         }
@@ -1047,19 +1073,138 @@ class DataStore {
         if (!tokenData) {
             return { success: false, error: 'Token不存在' }
         }
-        
+
         if (updates.name) {
             tokenData.name = updates.name
         }
         if (updates.permissions !== undefined) {
             tokenData.permissions = updates.permissions
         }
-        
+
         this.apiTokens.set(id, tokenData)
         await this.addLog('api_token_update', `更新API Token: ${tokenData.name}`, operator)
         await this.saveToFile()
-        
+
         return { success: true, data: tokenData }
+    }
+
+    // ============ 滥用检测与防护 ============
+
+    getAbuseConfig() {
+        return this.config.abuseConfig || null
+    }
+
+    async setAbuseConfig(config, operator = 'system') {
+        this.config.abuseConfig = {
+            ...this.config.abuseConfig,
+            ...config,
+        }
+        await this.addLog('abuse_config_update', '更新滥用防护配置', operator)
+        await this.saveToFile()
+        return { success: true, data: this.config.abuseConfig }
+    }
+
+    async addAbuseLog(logData) {
+        const log = {
+            id: this.generateId(),
+            ip: logData.ip || 'unknown',
+            path: logData.path || '',
+            method: logData.method || 'GET',
+            level: logData.level || 'low',
+            reason: logData.reason || '',
+            violations: logData.violations || [],
+            userAgent: logData.userAgent || '',
+            blocked: logData.blocked || false,
+            timestamp: Date.now(),
+        }
+        this.abuseLogs.push(log)
+        if (this.abuseLogs.length > 1000) {
+            this.abuseLogs = this.abuseLogs.slice(-1000)
+        }
+        if (this.abuseLogs.length % 5 === 0) {
+            await this.saveToFile()
+        }
+        return log
+    }
+
+    getAbuseLogs(limit = 100, offset = 0, filters = {}) {
+        let logs = this.abuseLogs.slice().reverse()
+        if (filters.ip) {
+            logs = logs.filter(l => l.ip === filters.ip)
+        }
+        if (filters.level) {
+            logs = logs.filter(l => l.level === filters.level)
+        }
+        if (filters.blocked !== undefined) {
+            logs = logs.filter(l => l.blocked === filters.blocked)
+        }
+        return logs.slice(offset, offset + limit)
+    }
+
+    async clearAbuseLogs(operator = 'system') {
+        this.abuseLogs = []
+        await this.addLog('abuse_logs_clear', '清空滥用日志', operator)
+        await this.saveToFile()
+        return { success: true }
+    }
+
+    getIpBans() {
+        const result = []
+        const now = Date.now()
+        for (const [ip, ban] of this.ipBans) {
+            if (ban.expiresAt && now > ban.expiresAt) continue
+            result.push({ ip, ...ban })
+        }
+        return result
+    }
+
+    async addIpBan(ip, reason, duration, violations = []) {
+        const now = Date.now()
+        this.ipBans.set(ip, {
+            reason: reason || 'auto_ban',
+            violations,
+            bannedAt: now,
+            expiresAt: now + (duration || 3600000),
+        })
+        await this.saveToFile()
+    }
+
+    async removeIpBan(ip, operator = 'system') {
+        if (this.ipBans.has(ip)) {
+            this.ipBans.delete(ip)
+            await this.addLog('ip_unban', `解封IP: ${ip}`, operator)
+            await this.saveToFile()
+            return { success: true }
+        }
+        return { success: false, error: 'IP不在封禁列表' }
+    }
+
+    getAbuseStats() {
+        const now = Date.now()
+        let banned = 0
+        let expired = 0
+        for (const [, ban] of this.ipBans) {
+            if (ban.expiresAt && now > ban.expiresAt) {
+                expired++
+            } else {
+                banned++
+            }
+        }
+        const recent = this.abuseLogs.slice(-100)
+        const blocked = recent.filter(l => l.blocked).length
+        const byLevel = {
+            high: recent.filter(l => l.level === 'high').length,
+            medium: recent.filter(l => l.level === 'medium').length,
+            low: recent.filter(l => l.level === 'low').length,
+            ban: recent.filter(l => l.level === 'ban').length,
+        }
+        return {
+            totalLogs: this.abuseLogs.length,
+            recentBlocked: blocked,
+            activeBans: banned,
+            expiredBans: expired,
+            byLevel,
+        }
     }
 }
 

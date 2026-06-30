@@ -714,6 +714,15 @@ const getAdminHtml = () => `<!DOCTYPE html>
             .monitor-status-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
             .settings-grid { max-width: none; }
             .user-info .user-name { display: none; }
+            .abuse-config-grid { grid-template-columns: 1fr; gap: 14px; }
+            .rule-toggles { grid-template-columns: 1fr 1fr; }
+            .ban-form-row { flex-wrap: wrap; }
+            .ban-input-reason { flex: 1; min-width: 120px; }
+            .ban-btn { width: 100%; }
+            .logs-toolbar { flex-direction: column; align-items: flex-start; }
+            .logs-filters { width: 100%; }
+            .filter-input { flex: 1; min-width: 0; }
+            .master-switch { padding: 16px; }
         }
 
         @media (max-width: 480px) {
@@ -779,6 +788,7 @@ const getAdminHtml = () => `<!DOCTYPE html>
                 <li data-section="cookies"><span class="menu-icon">🍪</span><span class="menu-text">Cookie管理</span></li>
                 <li data-section="monitor"><span class="menu-icon">🔔</span><span class="menu-text">Cookie监测</span></li>
                 <li data-section="tokens"><span class="menu-icon">🔑</span><span class="menu-text">API Token</span></li>
+                <li data-section="abuse"><span class="menu-icon">🛡️</span><span class="menu-text">滥用防护</span></li>
                 <li data-section="users"><span class="menu-icon">👥</span><span class="menu-text">用户管理</span></li>
                 <li data-section="logs"><span class="menu-icon">📋</span><span class="menu-text">操作日志</span></li>
                 <li data-section="settings"><span class="menu-icon">⚙️</span><span class="menu-text">设置</span></li>
@@ -990,6 +1000,130 @@ const getAdminHtml = () => `<!DOCTYPE html>
                     </div>
                 </div>
 
+                <div class="content-section" id="abuseSection">
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">防护概览</span></div>
+                        <div class="stats-grid" id="abuseStatsGrid">
+                            <div class="stat-card blue">
+                                <div class="stat-icon blue">👁</div>
+                                <div class="stat-value" id="abuseActiveRecords">0</div>
+                                <div class="stat-label">活跃监控</div>
+                            </div>
+                            <div class="stat-card red">
+                                <div class="stat-icon red">⛔</div>
+                                <div class="stat-value" id="abuseBannedCount">0</div>
+                                <div class="stat-label">封禁 IP</div>
+                            </div>
+                            <div class="stat-card orange">
+                                <div class="stat-icon orange">⚠</div>
+                                <div class="stat-value" id="abuseRecentBlocked">0</div>
+                                <div class="stat-label">最近拦截</div>
+                            </div>
+                            <div class="stat-card green">
+                                <div class="stat-icon green">📋</div>
+                                <div class="stat-value" id="abuseTotalLogs">0</div>
+                                <div class="stat-label">日志总数</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">防护配置</span></div>
+                        <form id="abuseConfigForm" style="max-width: 600px;">
+                            <div class="form-group">
+                                <label class="checkbox-label"><input type="checkbox" id="abuseEnabled"> 启用滥用防护</label>
+                            </div>
+                            <div class="form-group">
+                                <label>时间窗口（秒）</label>
+                                <input type="number" id="abuseWindowMs" min="10" max="3600" value="60">
+                                <small>检测时间范围内的请求频率</small>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex:1">
+                                    <label>窗口内最大请求数</label>
+                                    <input type="number" id="abuseMaxRequests" min="10" max="10000" value="120">
+                                </div>
+                                <div class="form-group" style="flex:1">
+                                    <label>API 最大请求数</label>
+                                    <input type="number" id="abuseMaxApiRequests" min="5" max="5000" value="60">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="flex:1">
+                                    <label>封禁阈值（违规次数）</label>
+                                    <input type="number" id="abuseThreshold" min="1" max="100" value="3">
+                                </div>
+                                <div class="form-group" style="flex:1">
+                                    <label>封禁时长（分钟）</label>
+                                    <input type="number" id="abuseDuration" min="1" max="1440" value="60">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>检测规则</label>
+                                <div style="display:flex;flex-wrap:wrap;gap:12px;">
+                                    <label class="checkbox-label"><input type="checkbox" id="abuseRuleRapid" checked> 速率检测</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="abuseRuleInvalid" checked> 可疑参数</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="abuseRulePath" checked> 路径枚举</label>
+                                    <label class="checkbox-label"><input type="checkbox" id="abuseRulePattern" checked> 模式检测</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">保存配置</button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">IP 封禁管理</span>
+                        </div>
+                        <form id="abuseBanForm" style="max-width: 600px;">
+                            <div class="form-row">
+                                <div class="form-group" style="flex:1">
+                                    <label>IP 地址</label>
+                                    <input type="text" id="banIPInput" placeholder="192.168.1.1" style="font-family:monospace;">
+                                </div>
+                                <div class="form-group" style="width:120px;flex:none;">
+                                    <label>封禁时长</label>
+                                    <input type="number" id="banDurationInput" placeholder="60" min="1" max="525600">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>封禁原因（可选）</label>
+                                <input type="text" id="banReasonInput" placeholder="简要说明封禁原因">
+                            </div>
+                            <button type="submit" class="btn btn-danger">⛔ 封禁此 IP</button>
+                        </form>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead><tr><th>IP</th><th>原因</th><th>封禁时间</th><th>到期</th><th>操作</th></tr></thead>
+                                <tbody id="abuseBansBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">滥用日志</span>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <select id="abuseLogLevel" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:12px;">
+                                    <option value="">全部级别</option>
+                                    <option value="low">低</option>
+                                    <option value="medium">中</option>
+                                    <option value="high">高</option>
+                                    <option value="ban">封禁</option>
+                                </select>
+                                <input type="text" id="abuseLogIP" placeholder="过滤IP" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:12px;width:140px;">
+                                <button class="btn btn-default btn-sm" onclick="loadAbuseLogs()">刷新</button>
+                                <button class="btn btn-danger btn-sm" onclick="clearAbuseLogs()">清空</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead><tr><th>时间</th><th>IP</th><th>级别</th><th>路径</th><th>原因</th><th>状态</th></tr></thead>
+                                <tbody id="abuseLogsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 <div class="content-section" id="settingsSection">
                     <div class="settings-grid">
                         <div class="card settings-section">
@@ -1387,14 +1521,152 @@ const getAdminHtml = () => `<!DOCTYPE html>
             document.querySelector('[data-section="' + section + '"]').classList.add('active');
             document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
             document.getElementById(section + 'Section').classList.add('active');
-            const titles = { dashboard: '仪表盘', cookies: 'Cookie管理', monitor: 'Cookie监测', tokens: 'API Token', users: '用户管理', logs: '操作日志', settings: '设置' };
+            const titles = { dashboard: '仪表盘', cookies: 'Cookie管理', monitor: 'Cookie监测', tokens: 'API Token', abuse: '滥用防护', users: '用户管理', logs: '操作日志', settings: '设置' };
             document.getElementById('pageTitle').textContent = titles[section];
             if (section === 'cookies') loadCookies();
             if (section === 'users') loadUsers();
             if (section === 'logs') loadLogs();
             if (section === 'monitor') loadMonitor();
             if (section === 'tokens') loadTokens();
+            if (section === 'abuse') loadAbuse();
         };
+
+        const loadAbuse = async () => {
+            await Promise.all([loadAbuseStats(), loadAbuseConfig(), loadAbuseBans(), loadAbuseLogs()]);
+        };
+
+        const loadAbuseStats = async () => {
+            const res = await api('/admin/abuse/stats');
+            if (res?.success) {
+                document.getElementById('abuseActiveRecords').textContent = res.data.activeRecords || 0;
+                document.getElementById('abuseBannedCount').textContent = res.data.activeBans || 0;
+                document.getElementById('abuseRecentBlocked').textContent = res.data.recentBlocked || 0;
+                document.getElementById('abuseTotalLogs').textContent = res.data.totalLogs || 0;
+            }
+        };
+
+        const loadAbuseConfig = async () => {
+            const res = await api('/admin/abuse/config');
+            if (res?.success && res.data) {
+                const c = res.data;
+                document.getElementById('abuseEnabled').checked = c.enabled !== false;
+                document.getElementById('abuseWindowMs').value = (c.rateLimit?.windowMs || 60000) / 1000;
+                document.getElementById('abuseMaxRequests').value = c.rateLimit?.maxRequests || 120;
+                document.getElementById('abuseMaxApiRequests').value = c.rateLimit?.maxApiRequests || 60;
+                document.getElementById('abuseThreshold').value = c.ban?.threshold || 3;
+                document.getElementById('abuseDuration').value = (c.ban?.duration || 3600000) / 60000;
+                document.getElementById('abuseRuleRapid').checked = c.rules?.rapidRequests !== false;
+                document.getElementById('abuseRuleInvalid').checked = c.rules?.invalidParams !== false;
+                document.getElementById('abuseRulePath').checked = c.rules?.pathEnumeration !== false;
+                document.getElementById('abuseRulePattern').checked = c.rules?.suspiciousPatterns !== false;
+            }
+        };
+
+        window.loadAbuseLogs = async () => {
+            const level = document.getElementById('abuseLogLevel').value;
+            const ip = document.getElementById('abuseLogIP').value;
+            const params = new URLSearchParams({ limit: 100 });
+            if (level) params.set('level', level);
+            if (ip) params.set('ip', ip);
+            const res = await api('/admin/abuse/logs?' + params.toString());
+            const tbody = document.getElementById('abuseLogsBody');
+            if (res?.success) {
+                tbody.innerHTML = res.data.map(log => {
+                    const badgeClass = log.level === 'ban' ? 'badge-error' : log.level === 'high' ? 'badge-warning' : log.level === 'medium' ? 'badge-info' : 'badge-primary';
+                    const statusHtml = log.blocked ? '<span style="color:#ef4444;">已拦截</span>' : '<span style="color:#10b981;">已记录</span>';
+                    return '<tr><td>' + escapeHtml(new Date(log.timestamp).toLocaleString('zh-CN')) + '</td>'
+                        + '<td>' + escapeHtml(log.ip) + '</td>'
+                        + '<td><span class="badge ' + badgeClass + '">' + escapeHtml(log.level) + '</span></td>'
+                        + '<td style="max-width:200px;word-break:break-all;">' + escapeHtml(log.path) + '</td>'
+                        + '<td>' + escapeHtml(log.reason) + '</td>'
+                        + '<td>' + statusHtml + '</td></tr>';
+                }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;">暂无日志</td></tr>';
+            }
+        };
+
+        const loadAbuseBans = async () => {
+            const res = await api('/admin/abuse/bans');
+            const tbody = document.getElementById('abuseBansBody');
+            if (res?.success) {
+                tbody.innerHTML = res.data.map(ban => {
+                    return '<tr><td>' + escapeHtml(ban.ip) + '</td>'
+                        + '<td>' + escapeHtml(ban.reason) + '</td>'
+                        + '<td>' + escapeHtml(new Date(ban.bannedAt).toLocaleString('zh-CN')) + '</td>'
+                        + '<td>' + escapeHtml(new Date(ban.expiresAt).toLocaleString('zh-CN')) + '</td>'
+                        + '<td><button class="btn btn-sm btn-default" onclick="unbanIP(\\'' + ban.ip + '\\')">解封</button></td></tr>';
+                }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">暂无封禁</td></tr>';
+            }
+        };
+
+        window.unbanIP = async (ip) => {
+            if (!confirm('确定解封 ' + ip + ' ？')) return;
+            const res = await api('/admin/abuse/bans/' + encodeURIComponent(ip), { method: 'DELETE' });
+            if (res?.success) {
+                showToast('已解封');
+                loadAbuseBans();
+                loadAbuseStats();
+            }
+        };
+
+        window.clearAbuseLogs = async () => {
+            if (!confirm('确定清空所有滥用日志？')) return;
+            const res = await api('/admin/abuse/logs', { method: 'DELETE' });
+            if (res?.success) {
+                showToast('已清空');
+                loadAbuseLogs();
+                loadAbuseStats();
+            }
+        };
+
+        document.addEventListener('submit', async (e) => {
+            if (e.target.id === 'abuseConfigForm') {
+                e.preventDefault();
+                const config = {
+                    enabled: document.getElementById('abuseEnabled').checked,
+                    rateLimit: {
+                        windowMs: parseInt(document.getElementById('abuseWindowMs').value) * 1000,
+                        maxRequests: parseInt(document.getElementById('abuseMaxRequests').value),
+                        maxApiRequests: parseInt(document.getElementById('abuseMaxApiRequests').value),
+                    },
+                    ban: {
+                        threshold: parseInt(document.getElementById('abuseThreshold').value),
+                        duration: parseInt(document.getElementById('abuseDuration').value) * 60000,
+                    },
+                    rules: {
+                        rapidRequests: document.getElementById('abuseRuleRapid').checked,
+                        invalidParams: document.getElementById('abuseRuleInvalid').checked,
+                        pathEnumeration: document.getElementById('abuseRulePath').checked,
+                        suspiciousPatterns: document.getElementById('abuseRulePattern').checked,
+                    },
+                };
+                const res = await api('/admin/abuse/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                });
+                if (res?.success) showToast('配置已保存');
+            }
+            if (e.target.id === 'abuseBanForm') {
+                e.preventDefault();
+                const ip = document.getElementById('banIPInput').value.trim();
+                const reason = document.getElementById('banReasonInput').value.trim();
+                const minutes = parseInt(document.getElementById('banDurationInput').value) || 60;
+                if (!ip) { showToast('请输入IP', 'error'); return; }
+                const res = await api('/admin/abuse/bans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, reason, duration: minutes * 60000 }),
+                });
+                if (res?.success) {
+                    showToast('已封禁');
+                    document.getElementById('banIPInput').value = '';
+                    document.getElementById('banReasonInput').value = '';
+                    document.getElementById('banDurationInput').value = '';
+                    loadAbuseBans();
+                    loadAbuseStats();
+                }
+            }
+        });
 
         const loadDashboard = async () => {
             const [cookiesRes, usersRes, logsRes] = await Promise.all([

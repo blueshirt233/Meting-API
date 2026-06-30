@@ -2,6 +2,7 @@ import store from '../admin/store.js'
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js'
 import { validateCookie } from './cookie-validator.js'
 import cookieMonitor from './cookie-monitor.js'
+import { banIP, unbanIP, resetIPRecord, getAbuseStats } from '../middleware/abuse-detector.js'
 
 const formatCookieForDisplay = (cookie) => {
     const { id, platform, note, createdAt, updatedAt, createdBy, isActive, isValid, validatedAt, userInfo, validationError } = cookie
@@ -449,6 +450,77 @@ export const adminRoutes = (app) => {
         } else {
             return c.json(result, 404)
         }
+    })
+
+    // ============ 滥用检测与防护 ============
+
+    app.get('/admin/abuse/stats', authMiddleware, adminMiddleware, async (c) => {
+        const runtimeStats = getAbuseStats()
+        const persistStats = store.getAbuseStats()
+        return c.json({
+            success: true,
+            data: { ...runtimeStats, ...persistStats },
+        })
+    })
+
+    app.get('/admin/abuse/logs', authMiddleware, adminMiddleware, async (c) => {
+        const limit = parseInt(c.req.query('limit') || '100')
+        const offset = parseInt(c.req.query('offset') || '0')
+        const ip = c.req.query('ip')
+        const level = c.req.query('level')
+        const blocked = c.req.query('blocked')
+
+        const filters = {}
+        if (ip) filters.ip = ip
+        if (level) filters.level = level
+        if (blocked !== undefined) filters.blocked = blocked === 'true'
+
+        const logs = store.getAbuseLogs(limit, offset, filters)
+        return c.json({ success: true, data: logs })
+    })
+
+    app.delete('/admin/abuse/logs', authMiddleware, adminMiddleware, async (c) => {
+        const operator = c.get('username')
+        await store.clearAbuseLogs(operator)
+        return c.json({ success: true })
+    })
+
+    app.get('/admin/abuse/config', authMiddleware, adminMiddleware, async (c) => {
+        return c.json({ success: true, data: store.getAbuseConfig() })
+    })
+
+    app.put('/admin/abuse/config', authMiddleware, adminMiddleware, async (c) => {
+        const operator = c.get('username')
+        const body = await c.req.json()
+        const result = await store.setAbuseConfig(body, operator)
+        return c.json(result, result.success ? 200 : 400)
+    })
+
+    app.get('/admin/abuse/bans', authMiddleware, adminMiddleware, async (c) => {
+        return c.json({ success: true, data: store.getIpBans() })
+    })
+
+    app.post('/admin/abuse/bans', authMiddleware, adminMiddleware, async (c) => {
+        const { ip, reason, duration } = await c.req.json()
+        if (!ip) return c.json({ success: false, error: 'IP不能为空' }, 400)
+
+        banIP(ip, reason, duration)
+        await store.addLog('ip_ban', `手动封禁IP: ${ip}`, c.get('username'))
+        return c.json({ success: true })
+    })
+
+    app.delete('/admin/abuse/bans/:ip', authMiddleware, adminMiddleware, async (c) => {
+        const ip = c.req.param('ip')
+        const operator = c.get('username')
+        unbanIP(ip)
+        await store.removeIpBan(ip, operator)
+        return c.json({ success: true })
+    })
+
+    app.post('/admin/abuse/reset/:ip', authMiddleware, adminMiddleware, async (c) => {
+        const ip = c.req.param('ip')
+        resetIPRecord(ip)
+        return c.json({ success: true })
     })
 }
 
