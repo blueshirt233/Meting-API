@@ -5,5 +5,6 @@ import config from './src/config.js'
 
 serve({
     fetch: app.fetch,
-    port: config.PORT
+    port: config.PORT,
+    hostname: '0.0.0.0'
 })
