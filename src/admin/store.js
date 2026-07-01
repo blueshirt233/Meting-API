@@ -1158,13 +1158,13 @@ class DataStore {
         return result
     }
 
-    async addIpBan(ip, reason, duration, violations = []) {
+    async addIpBan(ip, reason, duration, violations = [], permanent = false) {
         const now = Date.now()
         this.ipBans.set(ip, {
             reason: reason || 'auto_ban',
             violations,
             bannedAt: now,
-            expiresAt: now + (duration || 3600000),
+            expiresAt: permanent ? 0 : (now + (duration || 3600000)),
         })
         await this.saveToFile()
     }

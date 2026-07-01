@@ -502,11 +502,11 @@ export const adminRoutes = (app) => {
     })
 
     app.post('/admin/abuse/bans', authMiddleware, adminMiddleware, async (c) => {
-        const { ip, reason, duration } = await c.req.json()
+        const { ip, reason, duration, permanent } = await c.req.json()
         if (!ip) return c.json({ success: false, error: 'IP不能为空' }, 400)
 
-        banIP(ip, reason, duration)
-        await store.addLog('ip_ban', `手动封禁IP: ${ip}`, c.get('username'))
+        banIP(ip, reason, duration, !!permanent)
+        await store.addLog('ip_ban', `手动${permanent ? '永久' : ''}封禁IP: ${ip}`, c.get('username'))
         return c.json({ success: true })
     })
 

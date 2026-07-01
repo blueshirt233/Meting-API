@@ -49,11 +49,12 @@ const loadBannedIPs = () => {
         const bans = store.getIpBans()
         const now = Date.now()
         for (const ban of bans) {
-            if (ban.expiresAt && now < ban.expiresAt) {
+            // permanent: expiresAt === 0, always restore
+            if (!ban.expiresAt || now < ban.expiresAt) {
                 bannedIPs.set(ban.ip, {
                     reason: ban.reason,
                     bannedAt: ban.bannedAt,
-                    expiresAt: ban.expiresAt,
+                    expiresAt: ban.expiresAt || 0,
                 })
             }
         }
@@ -308,15 +309,14 @@ export const getAbuseStats = () => {
     }
 }
 
-export const banIP = (ip, reason, duration) => {
+export const banIP = (ip, reason, duration, permanent = false) => {
     const now = Date.now()
-    const banDuration = duration || DEFAULT_CONFIG.ban.duration
     bannedIPs.set(ip, {
         reason: reason || 'manual_ban',
         bannedAt: now,
-        expiresAt: now + banDuration,
+        expiresAt: permanent ? 0 : (now + (duration || DEFAULT_CONFIG.ban.duration)),
     })
-    store.addIpBan(ip, reason || 'manual_ban', banDuration, []).catch(() => {})
+    store.addIpBan(ip, reason || 'manual_ban', permanent ? 0 : (duration || DEFAULT_CONFIG.ban.duration), [], permanent).catch(() => {})
 }
 
 export const unbanIP = (ip) => {

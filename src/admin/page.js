@@ -1171,9 +1171,14 @@ const getAdminHtml = () => `<!DOCTYPE html>
                                     <input type="text" id="banIPInput" placeholder="192.168.1.1" style="font-family:monospace;">
                                 </div>
                                 <div class="form-group" style="width:120px;flex:none;">
-                                    <label>封禁时长</label>
+                                    <label>封禁时长（分钟）</label>
                                     <input type="number" id="banDurationInput" placeholder="60" min="1" max="525600">
                                 </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label" style="margin-bottom:12px;">
+                                    <input type="checkbox" id="banPermanentCheck"> 永久封禁（勾选后忽略时长，永不过期）
+                                </label>
                             </div>
                             <div class="form-group">
                                 <label>封禁原因（可选）</label>
@@ -1679,10 +1684,11 @@ const getAdminHtml = () => `<!DOCTYPE html>
             const tbody = document.getElementById('abuseBansBody');
             if (res?.success) {
                 tbody.innerHTML = res.data.map(ban => {
+                    const expired = ban.expiresAt ? new Date(ban.expiresAt).toLocaleString('zh-CN') : '永久';
                     return '<tr><td>' + escapeHtml(ban.ip) + '</td>'
                         + '<td>' + escapeHtml(ban.reason) + '</td>'
                         + '<td>' + escapeHtml(new Date(ban.bannedAt).toLocaleString('zh-CN')) + '</td>'
-                        + '<td>' + escapeHtml(new Date(ban.expiresAt).toLocaleString('zh-CN')) + '</td>'
+                        + '<td>' + escapeHtml(expired) + '</td>'
                         + '<td><button class="btn btn-sm btn-default" onclick="unbanIP(\\'' + ban.ip + '\\')">解封</button></td></tr>';
                 }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">暂无封禁</td></tr>';
             }
@@ -1741,11 +1747,18 @@ const getAdminHtml = () => `<!DOCTYPE html>
                 const ip = document.getElementById('banIPInput').value.trim();
                 const reason = document.getElementById('banReasonInput').value.trim();
                 const minutes = parseInt(document.getElementById('banDurationInput').value) || 60;
+                const permanent = document.getElementById('banPermanentCheck').checked;
                 if (!ip) { showToast('请输入IP', 'error'); return; }
+                const body = { ip, reason };
+                if (permanent) {
+                    body.permanent = true;
+                } else {
+                    body.duration = minutes * 60000;
+                }
                 const res = await api('/admin/abuse/bans', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip, reason, duration: minutes * 60000 }),
+                    body: JSON.stringify(body),
                 });
                 if (res?.success) {
                     showToast('已封禁');
