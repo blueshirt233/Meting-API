@@ -1,0 +1,27 @@
+# Meting-API Cloudflare Workers 部署配置
+# 部署前请先运行: npm install && npm run build:all
+# 部署命令: npx wrangler deploy
+
+name = "meting-api"
+main = "dist/cloudflare-workers-min.js"
+compatibility_date = "2025-07-07"
+
+# ── 路由配置 ──────────────────────────────
+# 方式一：使用 workers.dev 子域名（默认）
+#   npx wrangler deploy 后访问 https://meting-api.<你的账户>.workers.dev
+#
+# 方式二：绑定自定义域名（取消下面注释并填入你的域名）
+# routes = [
+#   { pattern = "api.music.example.com", custom_domain = true }
+# ]
+
+# ── 环境变量 ──────────────────────────────
+# Cloudflare Workers 自动检测为海外模式 (OVERSEAS=true)
+# 如需覆盖，取消下面的注释：
+# [vars]
+# OVERSEAS = "true"
+
+# ── 可观测性 ──────────────────────────────
+[observability]
+enabled = true
+head_sampling_rate = 0.1  # 10% 采样，免费计划够用
