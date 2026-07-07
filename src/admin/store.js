@@ -116,7 +116,7 @@ class DataStore {
             }
         }
         
-        if (this.users.size === 0) {
+        if (isServerRuntime && this.users.size === 0) {
             this.users.set('admin', {
                 username: 'admin',
                 password: this.hashPassword('admin123'),
