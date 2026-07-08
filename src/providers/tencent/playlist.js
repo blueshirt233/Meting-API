@@ -38,24 +38,18 @@ const get_playlist = async (id, cookie = '') => {
     result = await result.json()
     result = result.cdlist[0].songlist
 
-    let jsonp
-    if (config.OVERSEAS) {
-        const ids = result.map(song => song.songmid)
-        jsonp = await get_song_url(ids.join(','), cookie)
-    }
     const res = await Promise.all(result.map(async song => {
         let song_info = {
             author: song.singer.reduce((i, v) => ((i ? i + " / " : i) + v.name), ''),
             title: song.songname,
             pic: `https://y.gtimg.cn/music/photo_new/T002R300x300M000${song.albummid}.jpg`,
-            url: config.OVERSEAS ? '' : song.songmid,
+            url: config.OVERSEAS ? await get_song_url(song.songmid, cookie) : song.songmid,
             lrc: song.songmid,
             songmid: song.songmid,
         }
         return song_info
     }));
 
-    if (config.OVERSEAS) res[0].url = jsonp
     return res;
 }
 
